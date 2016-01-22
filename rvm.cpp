@@ -44,15 +44,16 @@ inline void vm_state::enter(uint32_t idx) {
             operand_stack.push(rt_value{program_counter});
             frames.push(operand_stack.size());
             operand_stack.resize(operand_stack.size()
-                + function_table[current_function].num_locals);
+                + function_table[idx].num_locals);
             current_function = idx;
             program_counter = 0;
             break;
         }
         case function_type::native:
         {
-            auto i = operand_stack.size() - function_table[idx].num_args;
-            auto retval = function_table[idx].pnf(&operand_stack[i]);
+            auto offset = operand_stack.size() - function_table[idx].num_args;
+            auto retval = function_table[idx].pnf(&operand_stack[offset]);
+            operand_stack.resize(offset);
             operand_stack.push(retval);
             break;
         }
@@ -104,14 +105,14 @@ void vm_state::logic_binop(Func f) {
         {
             auto y = operand_stack.pop().uint8;
             auto x = operand_stack.pop().uint8;
-            operand_stack.push(rt_value{static_cast<uint8_t>(f(x, y))});
+            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
             break;
         }
         case operand_type::uint32:
         {
             auto y = operand_stack.pop().uint32;
             auto x = operand_stack.pop().uint32;
-            operand_stack.push(rt_value{static_cast<uint8_t>(f(x, y))});
+            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
             break;
         }
     }
@@ -124,14 +125,14 @@ void vm_state::logic_binop_signed(Func f) {
         {
             auto y = static_cast<int8_t>(operand_stack.pop().uint8);
             auto x = static_cast<int8_t>(operand_stack.pop().uint8);
-            operand_stack.push(rt_value{static_cast<uint8_t>(f(x, y))});
+            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
             break;
         }
         case operand_type::uint32:
         {
             auto y = static_cast<int32_t>(operand_stack.pop().uint32);
             auto x = static_cast<int32_t>(operand_stack.pop().uint32);
-            operand_stack.push(rt_value{static_cast<uint8_t>(f(x, y))});
+            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
             break;
         }
     }
@@ -144,6 +145,11 @@ void vm_state::run() {
 }
 
 void vm_state::step() {
+    printf("step(): %d [", function_table[current_function].code[program_counter]);
+    for (auto i = 0u; i < operand_stack.size(); ++i) {
+        printf("%d ", operand_stack[i].uint32);
+    }
+    printf("]\n");
     switch (read_instruction()) {
         case instruction::add:
             arithmetic_binop(std::plus<>{});
@@ -350,8 +356,8 @@ void vm_state::step() {
             auto ctor = read_index();
             auto n = adt_table[idx][ctor].num_fields;
             auto* data = new rt_value[n];
-            for (uint32_t i = 0; i < n; ++i) {
-                data[i] = operand_stack.pop();
+            for (uint32_t i = 1; i <= n; ++i) {
+                data[n - i] = operand_stack.pop();
             }
             rt_adt adt{idx, ctor, data};
             operand_stack.push(rt_value{adt});
@@ -361,6 +367,12 @@ void vm_state::step() {
         {
             auto adt = operand_stack.pop().adt;
             delete adt.data;
+            break;
+        }
+        case instruction::ldctor:
+        {
+            auto adt = operand_stack.pop().adt;
+            operand_stack.push(rt_value{adt.constructor_index});
             break;
         }
         case instruction::ldfld:

@@ -65,6 +65,7 @@ enum class instruction: uint8_t {
 
     mkadt,  // #adt_table, #constructor
     dladt,
+    ldctor,
     ldfld,  // field_index
     stfld,  // field_index
 };
@@ -80,12 +81,12 @@ struct rt_adt {
 };
 struct rt_value {
     union {
-        uint8_t uint8 = 0;
+        uint8_t uint8;
         uint32_t uint32;
         rt_pointer pointer;
         rt_adt adt;
     };
-    rt_value() = default;
+    rt_value(): adt{0} {}
     explicit rt_value(uint8_t u): uint8{u} {}
     explicit rt_value(uint32_t u): uint32{u} {}
     explicit rt_value(rt_pointer p): pointer(p) {}
@@ -173,20 +174,23 @@ using constant_table = std::vector<rt_value>;
 
 class vm_state {
 public:
-    constant_table constant_table;
-    function_table function_table;
-    adt_table adt_table;
-
-    vm_state() = default;
+    vm_state(adt_table a, constant_table c, function_table f):
+        adt_table{a}, constant_table{c}, function_table{f} {
+        enter(MAIN_FUNCTION_INDEX);
+    }
     ~vm_state() = default;
     void run();
     void step();
 
 private:
+    adt_table adt_table;
+    constant_table constant_table;
+    function_table function_table;
+
     rt_stack operand_stack;
-    std::stack<uint32_t> frames{{0}};
-    uint32_t current_function{MAIN_FUNCTION_INDEX};
-    uint32_t program_counter{0};
+    std::stack<uint32_t> frames;
+    uint32_t current_function;
+    uint32_t program_counter;
     bool running{true};
 
     uint8_t read_u8();

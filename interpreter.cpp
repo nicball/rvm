@@ -1,22 +1,23 @@
-#include "rvm.h"
+#include "interpreter.h"
 #include <functional>
 #include <stdlib.h>
 
 using namespace rvm;
+using namespace rvm::interpreter;
 
-inline uint8_t vm_state::read_u8() {
+inline uint8_t Interpreter::read_u8() {
     return function_table[current_function].code[program_counter++];
 }
 
-inline instruction vm_state::read_instruction() {
-    return static_cast<instruction>(read_u8());
+inline Instruction Interpreter::read_instruction() {
+    return static_cast<Instruction>(read_u8());
 }
 
-inline operand_type vm_state::read_type() {
-    return static_cast<operand_type>(read_u8());
+inline OperandType Interpreter::read_type() {
+    return static_cast<OperandType>(read_u8());
 }
 
-inline uint32_t vm_state::read_index() {
+inline uint32_t Interpreter::read_index() {
     uint32_t re = 0;
     re |= read_u8() << 24;
     re |= read_u8() << 16;
@@ -25,23 +26,23 @@ inline uint32_t vm_state::read_index() {
     return re;
 }
 
-inline uint32_t vm_state::arg_offset(uint32_t idx) {
+inline uint32_t Interpreter::arg_offset(uint32_t idx) {
     return frames.top()
          - 2
          - function_table[current_function].num_args
          + idx;
 }
 
-inline uint32_t vm_state::local_offset(uint32_t idx) {
+inline uint32_t Interpreter::local_offset(uint32_t idx) {
     return frames.top() + idx;
 }
 
-inline void vm_state::enter(uint32_t idx) {
+inline void Interpreter::enter(uint32_t idx) {
     switch (function_table[idx].type) {
-        case function_type::managed:
+        case FunctionType::managed:
         {
-            operand_stack.push(rt_value{current_function});
-            operand_stack.push(rt_value{program_counter});
+            operand_stack.push(Value{current_function});
+            operand_stack.push(Value{program_counter});
             frames.push(operand_stack.size());
             operand_stack.resize(operand_stack.size()
                 + function_table[idx].num_locals);
@@ -49,7 +50,7 @@ inline void vm_state::enter(uint32_t idx) {
             program_counter = 0;
             break;
         }
-        case function_type::native:
+        case FunctionType::native:
         {
             auto offset = operand_stack.size() - function_table[idx].num_args;
             auto retval = function_table[idx].pnf(&operand_stack[offset]);
@@ -60,7 +61,7 @@ inline void vm_state::enter(uint32_t idx) {
     }
 }
 
-inline void vm_state::leave() {
+inline void Interpreter::leave() {
     auto retval = operand_stack.pop();
     if (frames.size() != 1) {
         operand_stack.resize(frames.top());
@@ -79,152 +80,152 @@ inline void vm_state::leave() {
 }
 
 template <class Func>
-void vm_state::arithmetic_binop(Func f) {
+void Interpreter::arithmetic_binop(Func f) {
     switch (read_type()) {
-        case operand_type::uint8:
+        case OperandType::uint8:
         {
             auto y = operand_stack.pop().uint8;
             auto x = operand_stack.pop().uint8;
-            operand_stack.push(rt_value{static_cast<uint8_t>(f(x, y))});
+            operand_stack.push(Value{static_cast<uint8_t>(f(x, y))});
             break;
         }
-        case operand_type::uint32:
+        case OperandType::uint32:
         {
             auto y = operand_stack.pop().uint32;
             auto x = operand_stack.pop().uint32;
-            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
             break;
         }
     }
 }
 
 template <class Func>
-void vm_state::logic_binop(Func f) {
+void Interpreter::logic_binop(Func f) {
     switch (read_type()) {
-        case operand_type::uint8:
+        case OperandType::uint8:
         {
             auto y = operand_stack.pop().uint8;
             auto x = operand_stack.pop().uint8;
-            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
             break;
         }
-        case operand_type::uint32:
+        case OperandType::uint32:
         {
             auto y = operand_stack.pop().uint32;
             auto x = operand_stack.pop().uint32;
-            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
             break;
         }
     }
 }
 
 template <class Func>
-void vm_state::logic_binop_signed(Func f) {
+void Interpreter::logic_binop_signed(Func f) {
     switch (read_type()) {
-        case operand_type::uint8:
+        case OperandType::uint8:
         {
             auto y = static_cast<int8_t>(operand_stack.pop().uint8);
             auto x = static_cast<int8_t>(operand_stack.pop().uint8);
-            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
             break;
         }
-        case operand_type::uint32:
+        case OperandType::uint32:
         {
             auto y = static_cast<int32_t>(operand_stack.pop().uint32);
             auto x = static_cast<int32_t>(operand_stack.pop().uint32);
-            operand_stack.push(rt_value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
             break;
         }
     }
 }
 
-void vm_state::run() {
+void Interpreter::run() {
     while (running) {
         step();
     }
 }
 
-void vm_state::step() {
+void Interpreter::step() {
     printf("step(): %d [", function_table[current_function].code[program_counter]);
     for (auto i = 0u; i < operand_stack.size(); ++i) {
         printf("%d ", operand_stack[i].uint32);
     }
     printf("]\n");
     switch (read_instruction()) {
-        case instruction::add:
+        case Instruction::add:
             arithmetic_binop(std::plus<>{});
             break;
-        case instruction::sub:
+        case Instruction::sub:
             arithmetic_binop(std::minus<>{});
             break;
-        case instruction::mul:
+        case Instruction::mul:
             arithmetic_binop(std::multiplies<>{});
             break;
-        case instruction::div:
+        case Instruction::div:
             arithmetic_binop(std::divides<>{});
             break;
-        case instruction::rem:
+        case Instruction::rem:
             arithmetic_binop(std::modulus<>{});
             break;
-        case instruction::band:
+        case Instruction::band:
             arithmetic_binop(std::bit_and<>{});
             break;
-        case instruction::bor:
+        case Instruction::bor:
             arithmetic_binop(std::bit_or<>{});
             break;
-        case instruction::bxor:
+        case Instruction::bxor:
             arithmetic_binop(std::bit_xor<>{});
             break;
-        case instruction::bnot:
+        case Instruction::bnot:
         {
             switch (read_type()) {
-                case operand_type::uint32:
+                case OperandType::uint32:
                 {
                     auto x = operand_stack.pop().uint32;
-                    operand_stack.push(rt_value{static_cast<uint32_t>(~x)});
+                    operand_stack.push(Value{static_cast<uint32_t>(~x)});
                     break;
                 }
-                case operand_type::uint8:
+                case OperandType::uint8:
                 {
                     auto x = operand_stack.pop().uint8;
-                    operand_stack.push(rt_value{static_cast<uint8_t>(~x)});
+                    operand_stack.push(Value{static_cast<uint8_t>(~x)});
                     break;
                 }
             }
             break;
         }
-        case instruction::dup:
+        case Instruction::dup:
         {
             auto x = operand_stack.pop();
             operand_stack.push(x);
             operand_stack.push(x);
             break;
         }
-        case instruction::drop:
+        case Instruction::drop:
         {
             if (operand_stack.size() == frames.top() + function_table[current_function].num_locals) {
                 --program_counter;
-                throw opstack_underflow_error{};
+                throw Stack::UnderflowError{};
             }
             else {
                 operand_stack.pop();
             }
             break;
         }
-        case instruction::ldc:
+        case Instruction::ldc:
         {
             auto idx = read_index();
             operand_stack.push(constant_table[idx]);
             break;
         }
-        case instruction::ldloc:
+        case Instruction::ldloc:
         {
             auto idx = read_index();
             auto offset = local_offset(idx);
             operand_stack.push(operand_stack[offset]);
             break;
         }
-        case instruction::stloc:
+        case Instruction::stloc:
         {
             auto idx = read_index();
             auto v = operand_stack.pop();
@@ -232,14 +233,14 @@ void vm_state::step() {
             operand_stack[offset] = v;
             break;
         }
-        case instruction::ldarg:
+        case Instruction::ldarg:
         {
             auto idx = read_index();
             auto offset = arg_offset(idx);
             operand_stack.push(operand_stack[offset]);
             break;
         }
-        case instruction::starg:
+        case Instruction::starg:
         {
             auto idx = read_index();
             auto v = operand_stack.pop();
@@ -247,102 +248,102 @@ void vm_state::step() {
             operand_stack[offset] = v;
             break;
         }
-        case instruction::call:
+        case Instruction::call:
         {
             auto idx = read_index();
             enter(idx);
             break;
         }
-        case instruction::ret:
+        case Instruction::ret:
             leave();
             break;
-        case instruction::ldloca:
+        case Instruction::ldloca:
         {
             auto idx = read_index();
-            operand_stack.push(rt_value{local_offset(idx)});
+            operand_stack.push(Value{local_offset(idx)});
             break;
         }
-        case instruction::ldarga:
+        case Instruction::ldarga:
         {
             auto idx = read_index();
-            operand_stack.push(rt_value{arg_offset(idx)});
+            operand_stack.push(Value{arg_offset(idx)});
             break;
         }
-        case instruction::ldfuna:
+        case Instruction::ldfuna:
         {
             auto idx = read_index();
-            operand_stack.push(rt_value{idx});
+            operand_stack.push(Value{idx});
             break;
         }
-        case instruction::calla:
+        case Instruction::calla:
         {
             auto idx = operand_stack.pop().uint32;
             if (idx >= function_table.size()) {
                 --program_counter;
-                throw index_out_of_bound_error{};
+                throw IndexOutOfBoundError{};
             }
             enter(idx);
         }
-        case instruction::ldind:
+        case Instruction::ldind:
         {
             auto idx = operand_stack.pop().pointer.index;
             operand_stack.push(operand_stack[idx]);
             break;
         }
-        case instruction::stind:
+        case Instruction::stind:
         {
             auto v = operand_stack.pop();
             auto idx = operand_stack.pop().pointer.index;
             operand_stack[idx] = v;
             break;
         }
-        case instruction::teq:
+        case Instruction::teq:
         {
             auto y = operand_stack.pop();
             auto x = operand_stack.pop();
-            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(rt_value)) == 0 ? 1 : 0);
-            operand_stack.push(rt_value{a});
+            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(Value)) == 0 ? 1 : 0);
+            operand_stack.push(Value{a});
             break;
         }
-        case instruction::tne:
+        case Instruction::tne:
         {
             auto y = operand_stack.pop();
             auto x = operand_stack.pop();
-            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(rt_value)) == 0 ? 0 : 1);
-            operand_stack.push(rt_value{a});
+            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(Value)) == 0 ? 0 : 1);
+            operand_stack.push(Value{a});
             break;
         }
-        case instruction::tlt:
+        case Instruction::tlt:
             logic_binop(std::less<>{});
             break;
-        case instruction::tlt_s:
+        case Instruction::tlt_s:
             logic_binop_signed(std::less<>{});
             break;
-        case instruction::tle:
+        case Instruction::tle:
             logic_binop(std::less_equal<>{});
             break;
-        case instruction::tle_s:
+        case Instruction::tle_s:
             logic_binop_signed(std::less_equal<>{});
             break;
-        case instruction::tgt:
+        case Instruction::tgt:
             logic_binop(std::less<>{});
             break;
-        case instruction::tgt_s:
+        case Instruction::tgt_s:
             logic_binop_signed(std::less<>{});
             break;
-        case instruction::tge:
+        case Instruction::tge:
             logic_binop(std::less_equal<>{});
             break;
-        case instruction::tge_s:
+        case Instruction::tge_s:
             logic_binop_signed(std::less_equal<>{});
             break;
-        case instruction::br:
+        case Instruction::br:
         {
             auto idx = read_index();
             program_counter = idx;
             break;
         }
-        case instruction::brtrue:
+        case Instruction::brtrue:
         {
             auto idx = read_index();
             if (operand_stack.pop().uint32 != 0) {
@@ -350,39 +351,39 @@ void vm_state::step() {
             }
             break;
         }
-        case instruction::mkadt:
+        case Instruction::mkadt:
         {
             auto idx = read_index();
             auto ctor = read_index();
             auto n = adt_table[idx][ctor].num_fields;
-            auto* data = new rt_value[n];
+            auto* data = new Value[n];
             for (uint32_t i = 1; i <= n; ++i) {
                 data[n - i] = operand_stack.pop();
             }
-            rt_adt adt{idx, ctor, data};
-            operand_stack.push(rt_value{adt});
+            Adt adt{idx, ctor, data};
+            operand_stack.push(Value{adt});
             break;
         }
-        case instruction::dladt:
+        case Instruction::dladt:
         {
             auto adt = operand_stack.pop().adt;
             delete adt.data;
             break;
         }
-        case instruction::ldctor:
+        case Instruction::ldctor:
         {
             auto adt = operand_stack.pop().adt;
-            operand_stack.push(rt_value{adt.constructor_index});
+            operand_stack.push(Value{adt.constructor_index});
             break;
         }
-        case instruction::ldfld:
+        case Instruction::ldfld:
         {
             auto idx = read_index();
             auto adt = operand_stack.pop().adt;
             operand_stack.push(adt.data[idx]);
             break;
         }
-        case instruction::stfld:
+        case Instruction::stfld:
         {
             auto idx = read_index();
             auto adt = operand_stack.pop().adt;

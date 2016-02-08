@@ -1,3 +1,3 @@
 #pragma once
-#include "instruction.h"
 #include "interpreter.h"
+#include "assembly.h"

@@ -41,8 +41,8 @@ inline void Interpreter::enter(uint32_t idx) {
     switch (function_table[idx].type) {
         case FunctionType::managed:
         {
-            operand_stack.push(Value{current_function});
-            operand_stack.push(Value{program_counter});
+            operand_stack.push(Operand{current_function});
+            operand_stack.push(Operand{program_counter});
             frames.push(operand_stack.size());
             operand_stack.resize(operand_stack.size()
                 + function_table[idx].num_locals);
@@ -53,7 +53,7 @@ inline void Interpreter::enter(uint32_t idx) {
         case FunctionType::native:
         {
             auto offset = operand_stack.size() - function_table[idx].num_args;
-            auto retval = function_table[idx].pnf(&operand_stack[offset]);
+            auto retval = function_table[idx].native_function(&operand_stack[offset]);
             operand_stack.resize(offset);
             operand_stack.push(retval);
             break;
@@ -86,14 +86,14 @@ void Interpreter::arithmetic_binop(Func f) {
         {
             auto y = operand_stack.pop().uint8;
             auto x = operand_stack.pop().uint8;
-            operand_stack.push(Value{static_cast<uint8_t>(f(x, y))});
+            operand_stack.push(Operand{static_cast<uint8_t>(f(x, y))});
             break;
         }
         case OperandType::uint32:
         {
             auto y = operand_stack.pop().uint32;
             auto x = operand_stack.pop().uint32;
-            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Operand{static_cast<uint32_t>(f(x, y))});
             break;
         }
     }
@@ -106,14 +106,14 @@ void Interpreter::logic_binop(Func f) {
         {
             auto y = operand_stack.pop().uint8;
             auto x = operand_stack.pop().uint8;
-            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Operand{static_cast<uint8_t>(f(x, y))});
             break;
         }
         case OperandType::uint32:
         {
             auto y = operand_stack.pop().uint32;
             auto x = operand_stack.pop().uint32;
-            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Operand{static_cast<uint8_t>(f(x, y))});
             break;
         }
     }
@@ -126,14 +126,14 @@ void Interpreter::logic_binop_signed(Func f) {
         {
             auto y = static_cast<int8_t>(operand_stack.pop().uint8);
             auto x = static_cast<int8_t>(operand_stack.pop().uint8);
-            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Operand{static_cast<uint8_t>(f(x, y))});
             break;
         }
         case OperandType::uint32:
         {
             auto y = static_cast<int32_t>(operand_stack.pop().uint32);
             auto x = static_cast<int32_t>(operand_stack.pop().uint32);
-            operand_stack.push(Value{static_cast<uint32_t>(f(x, y))});
+            operand_stack.push(Operand{static_cast<uint8_t>(f(x, y))});
             break;
         }
     }
@@ -182,13 +182,13 @@ void Interpreter::step() {
                 case OperandType::uint32:
                 {
                     auto x = operand_stack.pop().uint32;
-                    operand_stack.push(Value{static_cast<uint32_t>(~x)});
+                    operand_stack.push(Operand{static_cast<uint32_t>(~x)});
                     break;
                 }
                 case OperandType::uint8:
                 {
                     auto x = operand_stack.pop().uint8;
-                    operand_stack.push(Value{static_cast<uint8_t>(~x)});
+                    operand_stack.push(Operand{static_cast<uint8_t>(~x)});
                     break;
                 }
             }
@@ -215,7 +215,7 @@ void Interpreter::step() {
         case Instruction::ldc:
         {
             auto idx = read_index();
-            operand_stack.push(constant_table[idx]);
+            operand_stack.push(Operand{constant_table[idx]});
             break;
         }
         case Instruction::ldloc:
@@ -260,19 +260,19 @@ void Interpreter::step() {
         case Instruction::ldloca:
         {
             auto idx = read_index();
-            operand_stack.push(Value{local_offset(idx)});
+            operand_stack.push(Operand{local_offset(idx)});
             break;
         }
         case Instruction::ldarga:
         {
             auto idx = read_index();
-            operand_stack.push(Value{arg_offset(idx)});
+            operand_stack.push(Operand{arg_offset(idx)});
             break;
         }
         case Instruction::ldfuna:
         {
             auto idx = read_index();
-            operand_stack.push(Value{idx});
+            operand_stack.push(Operand{idx});
             break;
         }
         case Instruction::calla:
@@ -301,16 +301,16 @@ void Interpreter::step() {
         {
             auto y = operand_stack.pop();
             auto x = operand_stack.pop();
-            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(Value)) == 0 ? 1 : 0);
-            operand_stack.push(Value{a});
+            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(Operand)) == 0 ? 1 : 0);
+            operand_stack.push(Operand{a});
             break;
         }
         case Instruction::tne:
         {
             auto y = operand_stack.pop();
             auto x = operand_stack.pop();
-            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(Value)) == 0 ? 0 : 1);
-            operand_stack.push(Value{a});
+            auto a = static_cast<uint8_t>(memcmp(&x, &y, sizeof(Operand)) == 0 ? 0 : 1);
+            operand_stack.push(Operand{a});
             break;
         }
         case Instruction::tlt:
@@ -346,7 +346,7 @@ void Interpreter::step() {
         case Instruction::brtrue:
         {
             auto idx = read_index();
-            if (operand_stack.pop().uint32 != 0) {
+            if (operand_stack.pop().uint8 != 0) {
                 program_counter = idx;
             }
             break;
@@ -356,31 +356,31 @@ void Interpreter::step() {
             auto idx = read_index();
             auto ctor = read_index();
             auto n = adt_table[idx][ctor].num_fields;
-            auto* data = new Value[n];
+            auto* fields = new Operand[n];
             for (uint32_t i = 1; i <= n; ++i) {
-                data[n - i] = operand_stack.pop();
+                fields[n - i] = operand_stack.pop();
             }
-            Adt adt{idx, ctor, data};
-            operand_stack.push(Value{adt});
+            Adt adt{idx, ctor, fields};
+            operand_stack.push(Operand{adt});
             break;
         }
         case Instruction::dladt:
         {
             auto adt = operand_stack.pop().adt;
-            delete adt.data;
+            delete adt.fields;
             break;
         }
         case Instruction::ldctor:
         {
             auto adt = operand_stack.pop().adt;
-            operand_stack.push(Value{adt.constructor_index});
+            operand_stack.push(Operand{adt.constructor_index});
             break;
         }
         case Instruction::ldfld:
         {
             auto idx = read_index();
             auto adt = operand_stack.pop().adt;
-            operand_stack.push(adt.data[idx]);
+            operand_stack.push(adt.fields[idx]);
             break;
         }
         case Instruction::stfld:
@@ -388,7 +388,7 @@ void Interpreter::step() {
             auto idx = read_index();
             auto adt = operand_stack.pop().adt;
             auto v = operand_stack.pop();
-            adt.data[idx] = v;
+            adt.fields[idx] = v;
             break;
         }
     }

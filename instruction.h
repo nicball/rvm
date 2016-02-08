@@ -3,8 +3,6 @@
 
 namespace rvm {
 
-static constexpr uint32_t MAIN_FUNCTION_INDEX = 0;
-
 enum class OperandType: uint8_t {
     uint8,
     uint32,

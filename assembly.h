@@ -34,6 +34,7 @@ struct ConstantInfo {
         uint32_t uint32;
         Adt adt;
     };
+    ConstantInfo() = default;
     explicit ConstantInfo(uint8_t u): type{ConstantType::uint8}, uint8{u} {}
     explicit ConstantInfo(uint32_t u): type{ConstantType::uint32}, uint32{u} {}
     explicit ConstantInfo(Adt a): type{ConstantType::adt}, adt{a} {}
@@ -52,6 +53,8 @@ struct Assembly {
     AdtTable adt_table;
     ConstantTable constant_table;
     FunctionTable function_table;
+
+    struct ParseError {};
 
     void dump(std::ostream&);
     static Assembly parse(std::istream&);

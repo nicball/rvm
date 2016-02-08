@@ -1,5 +1,7 @@
 #include "rvm.h"
 #include <iostream>
+#include <fstream>
+#include <stdlib.h>
 
 rvm::interpreter::Operand native_print_uint32(rvm::interpreter::Operand* v) {
     std::cout << v->uint32 << std::endl;
@@ -34,10 +36,19 @@ int main() {
         rvm::assembly::ConstantInfo{static_cast<uint32_t>(10u)}
     };
     rvm::assembly::AdtTable adttab{};
+    rvm::assembly::Assembly assfile{adttab, consttab, functab};
 
-    rvm::interpreter::Interpreter vm{rvm::assembly::Assembly{adttab, consttab, functab}};
+    rvm::interpreter::Interpreter vm{assfile};
     vm.set_function(1, rvm::interpreter::NativeFunctionInfo{1, native_print_uint32});
     vm.run();
+
+    remove("1.rbc");
+    std::ofstream ofs("1.rbc");
+    assfile.dump(ofs);
+    ofs.close();
+
+    std::ifstream ifs("1.rbc");
+    auto newassfile = rvm::assembly::Assembly::parse(ifs);
 
     char a;
     std::cin >> a;

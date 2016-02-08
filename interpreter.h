@@ -100,7 +100,7 @@ struct FunctionInfo {
         num_args{a},
         num_locals{l},
         code{c} {}
-    FunctionInfo(NativeFunctionInfo fi):
+    explicit FunctionInfo(NativeFunctionInfo fi):
         type{FunctionType::native},
         num_args{fi.num_args},
         native_function{fi.native_function} {}
@@ -124,7 +124,7 @@ public:
     void run();
     void step();
     void set_function(uint32_t idx, NativeFunctionInfo f) {
-        function_table[idx] = f;
+        new(&function_table[idx]) FunctionInfo{f};
     }
 
 private:

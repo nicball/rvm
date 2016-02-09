@@ -46,7 +46,7 @@ int main() {
     auto newassfile = rvm::assembly::Assembly::parse(ifs);
 
     rvm::interpreter::Interpreter vm{newassfile};
-    vm.set_function(1, rvm::interpreter::NativeFunctionInfo{1, native_print_uint32});
+    vm.set_native_function(1, rvm::interpreter::NativeFunctionInfo{1, native_print_uint32});
     vm.run();
 
     char a;

@@ -5,7 +5,7 @@ using namespace rvm::assembly;
 namespace {
 
 void dump(uint8_t i, std::ostream& out) {
-    out.write(reinterpret_cast<char*>(&i), 1);
+    out.put(i);
 }
 void dump(uint32_t i, std::ostream& out) {
     dump(static_cast<uint8_t>((i & 0x000000FF) >>  0), out);
@@ -53,9 +53,10 @@ void dump(const FunctionInfo& f, std::ostream& out) {
 }
 
 void parse(uint8_t* i, std::istream& in) {
-    uint8_t re;
-    in.read(reinterpret_cast<char*>(&re), 1);
-    if (!in) throw Assembly::ParseError{};
+    auto re = in.get();
+    if (re == std::istream::traits_type::eof()) {
+        throw Assembly::ParseError{};
+    }
     *i = re;
 }
 void parse(uint32_t* i, std::istream& in) {

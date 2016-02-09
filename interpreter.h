@@ -123,7 +123,7 @@ public:
     ~Interpreter() = default;
     void run();
     void step();
-    void set_function(uint32_t idx, NativeFunctionInfo f) {
+    void set_native_function(uint32_t idx, NativeFunctionInfo f) {
         new(&function_table[idx]) FunctionInfo{f};
     }
 

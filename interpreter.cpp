@@ -19,10 +19,10 @@ inline OperandType Interpreter::read_type() {
 
 inline uint32_t Interpreter::read_index() {
     uint32_t re = 0;
-    re |= read_u8() << 24;
-    re |= read_u8() << 16;
-    re |= read_u8() << 8;
     re |= read_u8() << 0;
+    re |= read_u8() << 8;
+    re |= read_u8() << 16;
+    re |= read_u8() << 24;
     return re;
 }
 

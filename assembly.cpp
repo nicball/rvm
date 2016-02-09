@@ -5,13 +5,13 @@ using namespace rvm::assembly;
 namespace {
 
 void dump(uint8_t i, std::ostream& out) {
-    out.put(i);
+    out.write(reinterpret_cast<char*>(&i), 1);
 }
 void dump(uint32_t i, std::ostream& out) {
-    out.put(static_cast<uint8_t>((i & 0x000000FF) >> 0));
-    out.put(static_cast<uint8_t>((i & 0x0000FF00) >> 8));
-    out.put(static_cast<uint8_t>((i & 0x00FF0000) >> 16));
-    out.put(static_cast<uint8_t>((i & 0xFF000000) >> 24));
+    dump(static_cast<uint8_t>((i & 0x000000FF) >>  0), out);
+    dump(static_cast<uint8_t>((i & 0x0000FF00) >>  8), out);
+    dump(static_cast<uint8_t>((i & 0x00FF0000) >> 16), out);
+    dump(static_cast<uint8_t>((i & 0xFF000000) >> 24), out);
 }
 template <class T>
 void dump(const std::vector<T>& xs, std::ostream& out) {
@@ -52,85 +52,86 @@ void dump(const FunctionInfo& f, std::ostream& out) {
     dump(f.code, out);
 }
 
-void parse(uint8_t& i, std::istream& in) {
-    char re;
-    in.get(re);
+void parse(uint8_t* i, std::istream& in) {
+    uint8_t re;
+    in.read(reinterpret_cast<char*>(&re), 1);
     if (!in) throw Assembly::ParseError{};
-    i = re;
+    *i = re;
 }
-void parse(uint32_t& i, std::istream& in) {
+void parse(uint32_t* i, std::istream& in) {
     uint32_t re = 0;
     uint8_t tmp;
-    re |= (parse(tmp, in), tmp) << 0;
-    re |= (parse(tmp, in), tmp) << 8;
-    re |= (parse(tmp, in), tmp) << 16;
-    re |= (parse(tmp, in), tmp) << 24;
-    i = re;
+    re |= (parse(&tmp, in), tmp) << 0;
+    re |= (parse(&tmp, in), tmp) << 8;
+    re |= (parse(&tmp, in), tmp) << 16;
+    re |= (parse(&tmp, in), tmp) << 24;
+    *i = re;
 }
 template <class T>
-void parse(std::vector<T>& v, std::istream& in) {
+void parse(std::vector<T>* v, std::istream& in) {
     uint32_t size;
-    parse(size, in);
+    parse(&size, in);
     std::vector<T> re(size);
     for (uint32_t i = 0; i < size; ++i) {
-        T tmp;
-        parse(tmp, in);
-        re[i] = tmp;
+        parse(&re[i], in);
     }
-    v = re;
+    *v = re;
 }
-void parse(ConstructorInfo& c, std::istream& in) {
-    parse(c.num_fields, in);
+void parse(ConstructorInfo* c, std::istream& in) {
+    parse(&c->num_fields, in);
 }
-void parse(ConstantType& c, std::istream& in) {
+void parse(ConstantType* c, std::istream& in) {
     uint8_t re;
-    parse(re, in);
-    c = static_cast<ConstantType>(re);
+    parse(&re, in);
+    *c = static_cast<ConstantType>(re);
 }
-void parse(ConstantInfo&, std::istream&);
-void parse(Adt& a, std::istream& in) {
+void parse(ConstantInfo*, std::istream&);
+void parse(Adt* a, std::istream& in) {
     Adt re;
-    parse(re.adt_table_index, in);
-    parse(re.adt_table_index, in);
-    parse(re.num_fields, in);
+    parse(&re.adt_table_index, in);
+    parse(&re.adt_table_index, in);
+    parse(&re.num_fields, in);
     re.fields = new ConstantInfo[re.num_fields];
     for (uint32_t i = 0; i < re.num_fields; ++i) {
-        parse(re.fields[i], in);
+        parse(&re.fields[i], in);
     }
-    a = re;
+    *a = re;
 }
-void parse(ConstantInfo& c, std::istream& in) {
+void parse(ConstantInfo* c, std::istream& in) {
     ConstantInfo re;
-    parse(re.type, in);
+    parse(&re.type, in);
     switch (re.type) {
         case ConstantType::uint8:
-            parse(re.uint8, in);
+            parse(&re.uint8, in);
             break;
         case ConstantType::uint32:
-            parse(re.uint32, in);
+            parse(&re.uint32, in);
             break;
         case ConstantType::adt:
-            parse(re.adt, in);
+            parse(&re.adt, in);
             break;
     }
-    c = re;
+    *c = re;
 }
-void parse(FunctionInfo& f, std::istream& in) {
+void parse(FunctionInfo* f, std::istream& in) {
     FunctionInfo re;
-    parse(re.num_args, in);
-    parse(re.num_locals, in);
-    parse(re.code, in);
+    parse(&re.num_args, in);
+    parse(&re.num_locals, in);
+    parse(&re.code, in);
+    *f = re;
 }
 
 }
 
 void Assembly::dump(std::ostream& out) {
     ::dump(adt_table, out);
+    ::dump(constant_table, out);
+    ::dump(function_table, out);
 }
 Assembly Assembly::parse(std::istream& in) {
     Assembly re;
-    ::parse(re.adt_table, in);
-    ::parse(re.constant_table, in);
-    ::parse(re.function_table, in);
+    ::parse(&re.adt_table, in);
+    ::parse(&re.constant_table, in);
+    ::parse(&re.function_table, in);
     return re;
 }

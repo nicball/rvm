@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 rvm::interpreter::Operand native_print_uint32(rvm::interpreter::Operand* v) {
-    std::cout << v->uint32 << std::endl;
+    std::cout << v[0].uint32 << std::endl;
     return rvm::interpreter::Operand{static_cast<uint32_t>(0u)};
 }
 
@@ -38,17 +38,16 @@ int main() {
     rvm::assembly::AdtTable adttab{};
     rvm::assembly::Assembly assfile{adttab, consttab, functab};
 
-    rvm::interpreter::Interpreter vm{assfile};
-    vm.set_function(1, rvm::interpreter::NativeFunctionInfo{1, native_print_uint32});
-    vm.run();
-
-    remove("1.rbc");
-    std::ofstream ofs("1.rbc");
+    std::ofstream ofs("1.rbc", std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
     assfile.dump(ofs);
     ofs.close();
 
-    std::ifstream ifs("1.rbc");
+    std::ifstream ifs("1.rbc", std::ios_base::in | std::ios_base::binary);
     auto newassfile = rvm::assembly::Assembly::parse(ifs);
+
+    rvm::interpreter::Interpreter vm{newassfile};
+    vm.set_function(1, rvm::interpreter::NativeFunctionInfo{1, native_print_uint32});
+    vm.run();
 
     char a;
     std::cin >> a;

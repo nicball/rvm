@@ -9,6 +9,7 @@
 namespace rvm {
 namespace assembly {
 
+static constexpr uint32_t MAGIC_NUMBER = 0xBADDCAFE;
 static constexpr uint32_t MAIN_FUNCTION_INDEX = 0;
 
 struct ConstructorInfo {
@@ -75,10 +76,10 @@ public:
     }
     BytecodeBuilder& emit(Instruction i, uint32_t idx) {
         emit(i);
-        code.push_back((idx & 0x000000FF) >> 0);
-        code.push_back((idx & 0x0000FF00) >> 8);
-        code.push_back((idx & 0x00FF0000) >> 16);
         code.push_back((idx & 0xFF000000) >> 24);
+        code.push_back((idx & 0x00FF0000) >> 16);
+        code.push_back((idx & 0x0000FF00) >> 8);
+        code.push_back((idx & 0x000000FF) >> 0);
         return *this;
     }
     Bytecode& get() {

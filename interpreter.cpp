@@ -5,39 +5,39 @@
 using namespace rvm;
 using namespace rvm::interpreter;
 
-inline uint8_t Interpreter::read_u8() {
+uint8_t Interpreter::read_uint8() {
     return function_table[current_function].code[program_counter++];
 }
 
-inline Instruction Interpreter::read_instruction() {
-    return static_cast<Instruction>(read_u8());
+Instruction Interpreter::read_instruction() {
+    return static_cast<Instruction>(read_uint8());
 }
 
-inline OperandType Interpreter::read_type() {
-    return static_cast<OperandType>(read_u8());
+OperandType Interpreter::read_operand_type() {
+    return static_cast<OperandType>(read_uint8());
 }
 
-inline uint32_t Interpreter::read_index() {
+uint32_t Interpreter::read_uint32() {
     uint32_t re = 0;
-    re |= read_u8() << 0;
-    re |= read_u8() << 8;
-    re |= read_u8() << 16;
-    re |= read_u8() << 24;
+    re |= read_uint8() << 24;
+    re |= read_uint8() << 16;
+    re |= read_uint8() << 8;
+    re |= read_uint8() << 0;
     return re;
 }
 
-inline uint32_t Interpreter::arg_offset(uint32_t idx) {
+uint32_t Interpreter::arg_offset(uint32_t idx) {
     return frames.top()
          - 2
          - function_table[current_function].num_args
          + idx;
 }
 
-inline uint32_t Interpreter::local_offset(uint32_t idx) {
+uint32_t Interpreter::local_offset(uint32_t idx) {
     return frames.top() + idx;
 }
 
-inline void Interpreter::enter(uint32_t idx) {
+void Interpreter::enter(uint32_t idx) {
     switch (function_table[idx].type) {
         case FunctionType::managed:
         {
@@ -61,7 +61,7 @@ inline void Interpreter::enter(uint32_t idx) {
     }
 }
 
-inline void Interpreter::leave() {
+void Interpreter::leave() {
     auto retval = operand_stack.pop();
     if (frames.size() != 1) {
         operand_stack.resize(frames.top());
@@ -81,7 +81,7 @@ inline void Interpreter::leave() {
 
 template <class Func>
 void Interpreter::arithmetic_binop(Func f) {
-    switch (read_type()) {
+    switch (read_operand_type()) {
         case OperandType::uint8:
         {
             auto y = operand_stack.pop().uint8;
@@ -101,7 +101,7 @@ void Interpreter::arithmetic_binop(Func f) {
 
 template <class Func>
 void Interpreter::logic_binop(Func f) {
-    switch (read_type()) {
+    switch (read_operand_type()) {
         case OperandType::uint8:
         {
             auto y = operand_stack.pop().uint8;
@@ -121,7 +121,7 @@ void Interpreter::logic_binop(Func f) {
 
 template <class Func>
 void Interpreter::logic_binop_signed(Func f) {
-    switch (read_type()) {
+    switch (read_operand_type()) {
         case OperandType::uint8:
         {
             auto y = static_cast<int8_t>(operand_stack.pop().uint8);
@@ -178,7 +178,7 @@ void Interpreter::step() {
             break;
         case Instruction::bnot:
         {
-            switch (read_type()) {
+            switch (read_operand_type()) {
                 case OperandType::uint32:
                 {
                     auto x = operand_stack.pop().uint32;
@@ -214,20 +214,20 @@ void Interpreter::step() {
         }
         case Instruction::ldc:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             operand_stack.push(Operand{constant_table[idx]});
             break;
         }
         case Instruction::ldloc:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             auto offset = local_offset(idx);
             operand_stack.push(operand_stack[offset]);
             break;
         }
         case Instruction::stloc:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             auto v = operand_stack.pop();
             auto offset = local_offset(idx);
             operand_stack[offset] = v;
@@ -235,14 +235,14 @@ void Interpreter::step() {
         }
         case Instruction::ldarg:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             auto offset = arg_offset(idx);
             operand_stack.push(operand_stack[offset]);
             break;
         }
         case Instruction::starg:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             auto v = operand_stack.pop();
             auto offset = arg_offset(idx);
             operand_stack[offset] = v;
@@ -250,7 +250,7 @@ void Interpreter::step() {
         }
         case Instruction::call:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             enter(idx);
             break;
         }
@@ -259,19 +259,19 @@ void Interpreter::step() {
             break;
         case Instruction::ldloca:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             operand_stack.push(Operand{local_offset(idx)});
             break;
         }
         case Instruction::ldarga:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             operand_stack.push(Operand{arg_offset(idx)});
             break;
         }
         case Instruction::ldfuna:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             operand_stack.push(Operand{idx});
             break;
         }
@@ -339,13 +339,13 @@ void Interpreter::step() {
             break;
         case Instruction::br:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             program_counter = idx;
             break;
         }
         case Instruction::brtrue:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             if (operand_stack.pop().uint8 != 0) {
                 program_counter = idx;
             }
@@ -353,8 +353,8 @@ void Interpreter::step() {
         }
         case Instruction::mkadt:
         {
-            auto idx = read_index();
-            auto ctor = read_index();
+            auto idx = read_uint32();
+            auto ctor = read_uint32();
             auto n = adt_table[idx][ctor].num_fields;
             auto* fields = new Operand[n];
             for (uint32_t i = 1; i <= n; ++i) {
@@ -378,14 +378,14 @@ void Interpreter::step() {
         }
         case Instruction::ldfld:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             auto adt = operand_stack.pop().adt;
             operand_stack.push(adt.fields[idx]);
             break;
         }
         case Instruction::stfld:
         {
-            auto idx = read_index();
+            auto idx = read_uint32();
             auto adt = operand_stack.pop().adt;
             auto v = operand_stack.pop();
             adt.fields[idx] = v;

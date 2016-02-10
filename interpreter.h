@@ -43,7 +43,7 @@ struct Operand {
                 adt.constructor_index = v.adt.constructor_index;
                 adt.fields = new Operand[v.adt.num_fields];
                 for (auto i = 0u; i < v.adt.num_fields; ++i) {
-                    new(&adt.fields[i]) Operand{v.adt.fields[i]};
+                    adt.fields[i] = Operand{v.adt.fields[i]};
                 }
                 break;
             }
@@ -124,7 +124,7 @@ public:
     void run();
     void step();
     void set_native_function(uint32_t idx, NativeFunctionInfo f) {
-        new(&function_table[idx]) FunctionInfo{f};
+        function_table[idx] = FunctionInfo{f};
     }
 
 private:
@@ -138,10 +138,10 @@ private:
     uint32_t program_counter = 0;
     bool running{true};
 
-    uint8_t read_u8();
+    uint8_t read_uint8();
     Instruction read_instruction();
-    OperandType read_type();
-    uint32_t read_index();
+    OperandType read_operand_type();
+    uint32_t read_uint32();
     uint32_t arg_offset(uint32_t);
     uint32_t local_offset(uint32_t);
     void enter(uint32_t);

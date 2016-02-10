@@ -7,12 +7,14 @@ namespace {
 void dump(uint8_t i, std::ostream& out) {
     out.put(i);
 }
+
 void dump(uint32_t i, std::ostream& out) {
-    dump(static_cast<uint8_t>((i & 0x000000FF) >>  0), out);
-    dump(static_cast<uint8_t>((i & 0x0000FF00) >>  8), out);
-    dump(static_cast<uint8_t>((i & 0x00FF0000) >> 16), out);
     dump(static_cast<uint8_t>((i & 0xFF000000) >> 24), out);
+    dump(static_cast<uint8_t>((i & 0x00FF0000) >> 16), out);
+    dump(static_cast<uint8_t>((i & 0x0000FF00) >>  8), out);
+    dump(static_cast<uint8_t>((i & 0x000000FF) >>  0), out);
 }
+
 template <class T>
 void dump(const std::vector<T>& xs, std::ostream& out) {
     dump(xs.size(), out);
@@ -20,10 +22,13 @@ void dump(const std::vector<T>& xs, std::ostream& out) {
         dump(x, out);
     }
 }
+
 void dump(const ConstructorInfo& c, std::ostream& out) {
     dump(c.num_fields, out);
 }
+
 void dump(const ConstantInfo&, std::ostream&);
+
 void dump(const Adt& a, std::ostream& out) {
     dump(a.adt_table_index, out);
     dump(a.constructor_index, out);
@@ -32,6 +37,7 @@ void dump(const Adt& a, std::ostream& out) {
         dump(a.fields[i], out);
     }
 }
+
 void dump(const ConstantInfo& c, std::ostream& out) {
     dump(static_cast<uint8_t>(c.type), out);
     switch (c.type) {
@@ -46,6 +52,7 @@ void dump(const ConstantInfo& c, std::ostream& out) {
             break;
     }
 }
+
 void dump(const FunctionInfo& f, std::ostream& out) {
     dump(f.num_args, out);
     dump(f.num_locals, out);
@@ -59,15 +66,17 @@ void parse(uint8_t* i, std::istream& in) {
     }
     *i = re;
 }
+
 void parse(uint32_t* i, std::istream& in) {
     uint32_t re = 0;
     uint8_t tmp;
-    re |= (parse(&tmp, in), tmp) << 0;
-    re |= (parse(&tmp, in), tmp) << 8;
-    re |= (parse(&tmp, in), tmp) << 16;
     re |= (parse(&tmp, in), tmp) << 24;
+    re |= (parse(&tmp, in), tmp) << 16;
+    re |= (parse(&tmp, in), tmp) << 8;
+    re |= (parse(&tmp, in), tmp) << 0;
     *i = re;
 }
+
 template <class T>
 void parse(std::vector<T>* v, std::istream& in) {
     uint32_t size;
@@ -78,15 +87,19 @@ void parse(std::vector<T>* v, std::istream& in) {
     }
     *v = re;
 }
+
 void parse(ConstructorInfo* c, std::istream& in) {
     parse(&c->num_fields, in);
 }
+
 void parse(ConstantType* c, std::istream& in) {
     uint8_t re;
     parse(&re, in);
     *c = static_cast<ConstantType>(re);
 }
+
 void parse(ConstantInfo*, std::istream&);
+
 void parse(Adt* a, std::istream& in) {
     Adt re;
     parse(&re.adt_table_index, in);
@@ -98,6 +111,7 @@ void parse(Adt* a, std::istream& in) {
     }
     *a = re;
 }
+
 void parse(ConstantInfo* c, std::istream& in) {
     ConstantInfo re;
     parse(&re.type, in);
@@ -114,6 +128,7 @@ void parse(ConstantInfo* c, std::istream& in) {
     }
     *c = re;
 }
+
 void parse(FunctionInfo* f, std::istream& in) {
     FunctionInfo re;
     parse(&re.num_args, in);
@@ -125,11 +140,15 @@ void parse(FunctionInfo* f, std::istream& in) {
 }
 
 void Assembly::dump(std::ostream& out) {
+    ::dump(MAGIC_NUMBER, out);
     ::dump(adt_table, out);
     ::dump(constant_table, out);
     ::dump(function_table, out);
 }
 Assembly Assembly::parse(std::istream& in) {
+    uint32_t magic;
+    ::parse(&magic, in);
+    if (magic != MAGIC_NUMBER) throw ParseError{};
     Assembly re;
     ::parse(&re.adt_table, in);
     ::parse(&re.constant_table, in);

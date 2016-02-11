@@ -56,7 +56,9 @@ struct Assembly {
     FunctionTable function_table;
 
     struct ParseError {};
+    struct InvalidBytecodeError {};
 
+    void validate();
     void dump(std::ostream&);
     static Assembly parse(std::istream&);
 };
@@ -84,6 +86,51 @@ public:
     }
     Bytecode& get() {
         return code;
+    }
+};
+
+class BytecodeIterator {
+    const Bytecode* code;
+    uint32_t pc;
+public:
+    BytecodeIterator(const Bytecode& c): code{&c}, pc{0} {}
+    BytecodeIterator(const Bytecode& c, uint32_t p): code{&c}, pc{p} {}
+    uint8_t read_uint8() {
+        return (*code)[pc++];
+    }
+
+    Instruction read_instruction() {
+        return static_cast<Instruction>(read_uint8());
+    }
+
+    OperandType read_operand_type() {
+        return static_cast<OperandType>(read_uint8());
+    }
+
+    uint32_t read_uint32() {
+        uint32_t re = 0;
+        re |= read_uint8() << 24;
+        re |= read_uint8() << 16;
+        re |= read_uint8() << 8;
+        re |= read_uint8() << 0;
+        return re;
+    }
+
+    explicit operator uint32_t() {
+        return pc;
+    }
+
+    BytecodeIterator& operator = (uint32_t p) {
+        pc = p;
+        return *this;
+    }
+
+    void move_back() {
+        --pc;
+    }
+
+    bool finished() {
+        return pc >= code->size();
     }
 };
 

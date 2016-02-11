@@ -4,14 +4,14 @@
 namespace rvm {
 
 enum class OperandType: uint8_t {
-    uint8,
+    uint8 = 1,
     uint32,
     pointer,
     adt
 };
 
 enum class Instruction: uint8_t {
-    add,    // <type>
+    add = 1,    // <type>
     sub,    // <type>
     mul,    // <type>
     div,    // <type>

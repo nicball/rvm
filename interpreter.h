@@ -114,9 +114,9 @@ public:
     Interpreter(const assembly::Assembly& a):
         adt_table{a.adt_table},
         constant_table{a.constant_table},
-        function_table{a.function_table.size()}  {
+        function_table(a.function_table.size())  {
         for (size_t i = 0; i < a.function_table.size(); ++i) {
-            new(&function_table[i]) FunctionInfo{a.function_table[i]};
+            function_table[i] = FunctionInfo{a.function_table[i]};
         }
         enter(assembly::MAIN_FUNCTION_INDEX);
     }
@@ -134,14 +134,11 @@ private:
 
     Stack operand_stack{};
     std::stack<uint32_t> frames{{}};
-    uint32_t current_function = assembly::MAIN_FUNCTION_INDEX;
-    uint32_t program_counter = 0;
+    size_t current_function_index{0};
+    assembly::BytecodeIterator program_counter{function_table[assembly::MAIN_FUNCTION_INDEX].code};
     bool running{true};
 
-    uint8_t read_uint8();
-    Instruction read_instruction();
-    OperandType read_operand_type();
-    uint32_t read_uint32();
+    FunctionInfo& current_function();
     uint32_t arg_offset(uint32_t);
     uint32_t local_offset(uint32_t);
     void enter(uint32_t);

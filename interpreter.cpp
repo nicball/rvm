@@ -5,31 +5,14 @@
 using namespace rvm;
 using namespace rvm::interpreter;
 
-uint8_t Interpreter::read_uint8() {
-    return function_table[current_function].code[program_counter++];
-}
-
-Instruction Interpreter::read_instruction() {
-    return static_cast<Instruction>(read_uint8());
-}
-
-OperandType Interpreter::read_operand_type() {
-    return static_cast<OperandType>(read_uint8());
-}
-
-uint32_t Interpreter::read_uint32() {
-    uint32_t re = 0;
-    re |= read_uint8() << 24;
-    re |= read_uint8() << 16;
-    re |= read_uint8() << 8;
-    re |= read_uint8() << 0;
-    return re;
+FunctionInfo& Interpreter::current_function() {
+    return function_table[current_function_index];
 }
 
 uint32_t Interpreter::arg_offset(uint32_t idx) {
     return frames.top()
          - 2
-         - function_table[current_function].num_args
+         - current_function().num_args
          + idx;
 }
 
@@ -41,13 +24,13 @@ void Interpreter::enter(uint32_t idx) {
     switch (function_table[idx].type) {
         case FunctionType::managed:
         {
-            operand_stack.push(Operand{current_function});
-            operand_stack.push(Operand{program_counter});
+            operand_stack.push(Operand{current_function_index});
+            operand_stack.push(Operand{static_cast<uint32_t>(program_counter)});
             frames.push(operand_stack.size());
             operand_stack.resize(operand_stack.size()
                 + function_table[idx].num_locals);
-            current_function = idx;
-            program_counter = 0;
+            current_function_index = idx;
+            program_counter = assembly::BytecodeIterator{function_table[idx].code};
             break;
         }
         case FunctionType::native:
@@ -68,11 +51,11 @@ void Interpreter::leave() {
         auto old_pc = operand_stack.pop().uint32;
         auto old_func = operand_stack.pop().uint32;
         operand_stack.resize(operand_stack.size()
-                           - function_table[current_function].num_args);
+                           - current_function().num_args);
         operand_stack.push(retval);
         frames.pop();
-        current_function = old_func;
-        program_counter = old_pc;
+        current_function_index = old_func;
+        program_counter = assembly::BytecodeIterator{function_table[old_func].code, old_pc};
     }
     else {
         running = false;
@@ -81,7 +64,7 @@ void Interpreter::leave() {
 
 template <class Func>
 void Interpreter::arithmetic_binop(Func f) {
-    switch (read_operand_type()) {
+    switch (program_counter.read_operand_type()) {
         case OperandType::uint8:
         {
             auto y = operand_stack.pop().uint8;
@@ -101,7 +84,7 @@ void Interpreter::arithmetic_binop(Func f) {
 
 template <class Func>
 void Interpreter::logic_binop(Func f) {
-    switch (read_operand_type()) {
+    switch (program_counter.read_operand_type()) {
         case OperandType::uint8:
         {
             auto y = operand_stack.pop().uint8;
@@ -121,7 +104,7 @@ void Interpreter::logic_binop(Func f) {
 
 template <class Func>
 void Interpreter::logic_binop_signed(Func f) {
-    switch (read_operand_type()) {
+    switch (program_counter.read_operand_type()) {
         case OperandType::uint8:
         {
             auto y = static_cast<int8_t>(operand_stack.pop().uint8);
@@ -146,12 +129,7 @@ void Interpreter::run() {
 }
 
 void Interpreter::step() {
-    printf("step(): %d [", function_table[current_function].code[program_counter]);
-    for (auto i = 0u; i < operand_stack.size(); ++i) {
-        printf("%d ", operand_stack[i].uint32);
-    }
-    printf("]\n");
-    switch (read_instruction()) {
+    switch (program_counter.read_instruction()) {
         case Instruction::add:
             arithmetic_binop(std::plus<>{});
             break;
@@ -178,7 +156,7 @@ void Interpreter::step() {
             break;
         case Instruction::bnot:
         {
-            switch (read_operand_type()) {
+            switch (program_counter.read_operand_type()) {
                 case OperandType::uint32:
                 {
                     auto x = operand_stack.pop().uint32;
@@ -203,8 +181,8 @@ void Interpreter::step() {
         }
         case Instruction::drop:
         {
-            if (operand_stack.size() == frames.top() + function_table[current_function].num_locals) {
-                --program_counter;
+            if (operand_stack.size() == frames.top() + current_function().num_locals) {
+                program_counter.move_back();
                 throw Stack::UnderflowError{};
             }
             else {
@@ -214,20 +192,20 @@ void Interpreter::step() {
         }
         case Instruction::ldc:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             operand_stack.push(Operand{constant_table[idx]});
             break;
         }
         case Instruction::ldloc:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             auto offset = local_offset(idx);
             operand_stack.push(operand_stack[offset]);
             break;
         }
         case Instruction::stloc:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             auto v = operand_stack.pop();
             auto offset = local_offset(idx);
             operand_stack[offset] = v;
@@ -235,14 +213,14 @@ void Interpreter::step() {
         }
         case Instruction::ldarg:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             auto offset = arg_offset(idx);
             operand_stack.push(operand_stack[offset]);
             break;
         }
         case Instruction::starg:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             auto v = operand_stack.pop();
             auto offset = arg_offset(idx);
             operand_stack[offset] = v;
@@ -250,7 +228,7 @@ void Interpreter::step() {
         }
         case Instruction::call:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             enter(idx);
             break;
         }
@@ -259,19 +237,19 @@ void Interpreter::step() {
             break;
         case Instruction::ldloca:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             operand_stack.push(Operand{local_offset(idx)});
             break;
         }
         case Instruction::ldarga:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             operand_stack.push(Operand{arg_offset(idx)});
             break;
         }
         case Instruction::ldfuna:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             operand_stack.push(Operand{idx});
             break;
         }
@@ -279,10 +257,11 @@ void Interpreter::step() {
         {
             auto idx = operand_stack.pop().uint32;
             if (idx >= function_table.size()) {
-                --program_counter;
+                program_counter.move_back();
                 throw IndexOutOfBoundError{};
             }
             enter(idx);
+            break;
         }
         case Instruction::ldind:
         {
@@ -339,13 +318,13 @@ void Interpreter::step() {
             break;
         case Instruction::br:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             program_counter = idx;
             break;
         }
         case Instruction::brtrue:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             if (operand_stack.pop().uint8 != 0) {
                 program_counter = idx;
             }
@@ -353,8 +332,8 @@ void Interpreter::step() {
         }
         case Instruction::mkadt:
         {
-            auto idx = read_uint32();
-            auto ctor = read_uint32();
+            auto idx = program_counter.read_uint32();
+            auto ctor = program_counter.read_uint32();
             auto n = adt_table[idx][ctor].num_fields;
             auto* fields = new Operand[n];
             for (uint32_t i = 1; i <= n; ++i) {
@@ -378,14 +357,17 @@ void Interpreter::step() {
         }
         case Instruction::ldfld:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             auto adt = operand_stack.pop().adt;
+            if (idx >= adt_table[adt.adt_table_index][adt.constructor_index].num_fields) {
+                throw IndexOutOfBoundError{};
+            }
             operand_stack.push(adt.fields[idx]);
             break;
         }
         case Instruction::stfld:
         {
-            auto idx = read_uint32();
+            auto idx = program_counter.read_uint32();
             auto adt = operand_stack.pop().adt;
             auto v = operand_stack.pop();
             adt.fields[idx] = v;

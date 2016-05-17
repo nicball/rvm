@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <stdint.h>
 #include <vector>
 #include <stack>
@@ -8,140 +9,63 @@
 namespace rvm {
 namespace interpreter {
 
-struct Operand;
-struct Pointer {
-    uint32_t index;
-};
-struct Adt {
-    uint32_t adt_table_index;
-    uint32_t constructor_index;
-    Operand* fields;
-};
+struct Adt;
 struct Operand {
     union {
-        uint8_t uint8;
-        uint32_t uint32;
-        Pointer pointer;
-        Adt adt;
+        int8_t int8;
+        int32_t int32;
+        Adt* adt;
     };
-    Operand(): adt{0} {}
-    explicit Operand(uint8_t u): Operand{} { uint8 = u; }
-    explicit Operand(uint32_t u): Operand{} { uint32 = u; }
-    explicit Operand(Pointer p): Operand{} { pointer = p;  }
-    explicit Operand(Adt a): Operand{} { adt = a; }
-    explicit Operand(const assembly::ConstantInfo& v) {
-        switch (v.type) {
-            case assembly::ConstantType::uint8:
-                uint8 = v.uint8;
-                break;
-            case assembly::ConstantType::uint32:
-                uint32 = v.uint32;
-                break;
-            case assembly::ConstantType::adt:
-            {
-                adt.adt_table_index = v.adt.adt_table_index;
-                adt.constructor_index = v.adt.constructor_index;
-                adt.fields = new Operand[v.adt.num_fields];
-                for (auto i = 0u; i < v.adt.num_fields; ++i) {
-                    adt.fields[i] = Operand{v.adt.fields[i]};
-                }
-                break;
-            }
-        }
+
+    Operand() = default;
+    explicit Operand(int8_t i): int8{i} {}
+    explicit Operand(int32_t i): int32{i} {}
+    explicit Operand(Adt* a): adt{a} {}
+    explicit Operand(assembly::ConstantInfo&);
+    void free_adt() {
+        free(adt);
     }
 };
-
-class Stack: private std::vector<Operand> {
-public:
-    struct UnderflowError {};
-
-    Stack() = default;
-    ~Stack() = default;
-    using std::vector<Operand>::operator[];
-    using std::vector<Operand>::size;
-    using std::vector<Operand>::resize;
-
-    void push(Operand v) {
-        this->push_back(v);
-    }
-    Operand pop() {
-        if (this->size() == 0) throw UnderflowError{};
-        auto re = this->back();
-        this->pop_back();
-        return re;
-    }
+struct Adt {
+    index_t adt_table_index;
+    sindex_t constructor_index;
+    Operand fields[1];
 };
 
-using assembly::AdtTable;
-using assembly::ConstantTable;
-enum class FunctionType {
-    managed, native
+struct NativeInfo {
+    std::function<Operand(Operand[])> func;
+    index_t num_args;
 };
-using NativeFunction = Operand (*)(Operand*);
-struct NativeFunctionInfo {
-    uint32_t num_args;
-    NativeFunction native_function;
-};
-struct FunctionInfo {
-    FunctionType type;
-    uint32_t num_args;
-    uint32_t num_locals;
-    assembly::Bytecode code;
-    NativeFunction native_function;
-
-    FunctionInfo() = default;
-    explicit FunctionInfo(const assembly::FunctionInfo& f):
-        type{FunctionType::managed},
-        num_args{f.num_args},
-        num_locals{f.num_locals},
-        code{f.code}  {}
-    FunctionInfo(uint32_t a, uint32_t l, assembly::Bytecode c):
-        type{FunctionType::managed},
-        num_args{a},
-        num_locals{l},
-        code{c} {}
-    explicit FunctionInfo(NativeFunctionInfo fi):
-        type{FunctionType::native},
-        num_args{fi.num_args},
-        native_function{fi.native_function} {}
-};
-using FunctionTable = std::vector<FunctionInfo>;
 
 class Interpreter {
 public:
     struct IndexOutOfBoundError {};
+    struct StackUnderflowError {};
 
-    Interpreter(const assembly::Assembly& a):
-        adt_table{a.adt_table},
-        constant_table{a.constant_table},
-        function_table(a.function_table.size())  {
-        for (size_t i = 0; i < a.function_table.size(); ++i) {
-            function_table[i] = FunctionInfo{a.function_table[i]};
-        }
+    Interpreter(assembly::Assembly& a): assembly(a) {
         enter(assembly::MAIN_FUNCTION_INDEX);
     }
-    ~Interpreter() = default;
     void run();
     void step();
-    void set_native_function(uint32_t idx, NativeFunctionInfo f) {
-        function_table[idx] = FunctionInfo{f};
+    void add_native_function(NativeInfo f) {
+        native_table.push_back(f);
     }
 
 private:
-    AdtTable adt_table;
-    ConstantTable constant_table;
-    FunctionTable function_table;
+    assembly::Assembly assembly{};
+    std::vector<NativeInfo> native_table{};
 
-    Stack operand_stack{};
-    std::stack<uint32_t> frames{{}};
-    size_t current_function_index{0};
-    assembly::BytecodeIterator program_counter{function_table[assembly::MAIN_FUNCTION_INDEX].code};
+    std::vector<Operand> operand_stack{};
+    std::stack<int32_t> frames{{}};
+    index_t current_function_index{0};
+    index_t program_counter;
     bool running{true};
 
-    FunctionInfo& current_function();
-    uint32_t arg_offset(uint32_t);
-    uint32_t local_offset(uint32_t);
-    void enter(uint32_t);
+    assembly::FunctionInfo& current_function();
+    index_t arg_offset(index_t);
+    index_t local_offset(index_t);
+    void enter(index_t);
+    void call_native(index_t);
     void leave();
     template <class Func>
     void arithmetic_binop(Func);
@@ -150,6 +74,23 @@ private:
     template <class Func>
     void logic_binop_signed(Func);
 };
+
+inline Operand::Operand(assembly::ConstantInfo& c) {
+    switch (c.type) {
+        case assembly::ConstantType::int8:
+            int8 = c.int8;
+            break;
+        case assembly::ConstantType::int32:
+            int32 = c.int32;
+            break;
+        case assembly::ConstantType::adt:
+            adt = (Adt*)malloc(sizeof(Adt) + c.adt.num_fields);
+            for (auto i = c.adt.num_fields; i > 0; --i) {
+                adt->fields[i - 1] = Operand{c.adt.fields[i - 1]};
+            }
+            break;
+    }
+}
 
 }
 }

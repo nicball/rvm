@@ -3,14 +3,14 @@
 
 namespace rvm {
 
-enum class OperandType: uint8_t {
-    uint8 = 1,
-    uint32,
+enum class OperandType: int8_t {
+    int8 = 1,
+    int32,
     pointer,
     adt
 };
 
-enum class Instruction: uint8_t {
+enum class Operation: int8_t {
     add = 1,    // <type>
     sub,    // <type>
     mul,    // <type>
@@ -29,6 +29,7 @@ enum class Instruction: uint8_t {
     ldarg,  // #args
     starg,  // #args
     call,   // #function_table
+    callnative, // #native_table
     ret,
     ldloca, // #locals
     ldarga, // #args
@@ -57,5 +58,23 @@ enum class Instruction: uint8_t {
     ldfld,  // field_index
     stfld,  // field_index
 };
+
+using index_t = int16_t;
+using sindex_t = int8_t;
+struct Instruction {
+    Operation op;
+    union {
+        index_t index{0};
+        OperandType type;
+    };
+    sindex_t index2{0};
+
+    Instruction() = default;
+    explicit Instruction(Operation o): op{o} {}
+    Instruction(Operation o, OperandType t): op{o}, type{t} {}
+    Instruction(Operation o, index_t d): op{o}, index{d} {}
+    Instruction(Operation o, index_t d, sindex_t s): op{o}, index{d}, index2{s} {}
+};
+
 
 }

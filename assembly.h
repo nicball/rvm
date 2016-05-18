@@ -9,7 +9,7 @@
 namespace rvm {
 namespace assembly {
 
-static constexpr int32_t MAGIC_NUMBER = 0xBADDCAFE;
+static constexpr uint32_t MAGIC_NUMBER = 0xBADDCAFE;
 static constexpr index_t MAIN_FUNCTION_INDEX = 0;
 
 struct ConstructorInfo {
@@ -60,8 +60,8 @@ struct Assembly {
     static Assembly parse(std::istream&);
 };
 
-void validate(Assembly&);
-void dump(Assembly&, std::ostream&);
+void validate(const Assembly&);
+void dump(const Assembly&, std::ostream&);
 
 }
 }

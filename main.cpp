@@ -10,7 +10,6 @@ rvm::interpreter::Operand native_print_int32(rvm::interpreter::Operand* v) {
 
 int main() {
     using namespace rvm;
-
     auto main_bc = assembly::Bytecode{
         Instruction{Operation::ldc, 0},
         Instruction{Operation::stloc, 0},   // i = 1;
@@ -24,7 +23,7 @@ int main() {
         Instruction{Operation::ldloc, 0},
         Instruction{Operation::ldc, 1},
         Instruction{Operation::tlt, OperandType::int32},
-        Instruction{Operation::brtrue, 10}, // if (i < 10) goto loop;
+        Instruction{Operation::brtrue, 2}, // if (i < 10) goto loop;
         Instruction{Operation::ldloc, 0},
         Instruction{Operation::callnative, 0},
         Instruction{Operation::ret}       // return native_print_int32(i);

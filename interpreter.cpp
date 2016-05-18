@@ -263,7 +263,7 @@ void Interpreter::step() {
         }
         case Operation::calla:
         {
-            auto idx = pop(operand_stack).int32;
+            auto idx = static_cast<index_t>(pop(operand_stack).int32);
             if (idx >= assembly.function_table.size()) {
                 --program_counter;
                 throw IndexOutOfBoundError{};
@@ -334,7 +334,7 @@ void Interpreter::step() {
         {
             auto idx = current_function().code[program_counter].index;
             if (pop(operand_stack).int8 != 0) {
-                program_counter = idx;
+                program_counter = idx - 1;
             }
             break;
         }
@@ -380,4 +380,5 @@ void Interpreter::step() {
             break;
         }
     }
+    ++program_counter;
 }

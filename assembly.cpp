@@ -7,40 +7,37 @@ using namespace rvm::assembly;
 
 namespace {
 
-void dump(int8_t i, std::ostream& out) {
-    printf("dump_int8: %d\n", i);
+void dump(uint8_t i, std::ostream& out) {
     out.put(i);
 }
 
-void dump(int16_t i, std::ostream& out) {
-    printf("dump_int16: %d\n", i);
-    dump(int8_t(uint8_t(uint16_t(i) & 0xFF00 >> 8)), out);
-    dump(int8_t(uint8_t(uint16_t(i) & 0x00FF >> 0)), out);
+void dump(uint16_t i, std::ostream& out) {
+    dump(static_cast<uint8_t>((i & 0xFF00) >> 8), out);
+    dump(static_cast<uint8_t>((i & 0x00FF) >> 0), out);
 }
 
-void dump(int32_t i, std::ostream& out) {
-    printf("dump_int32: %d\n", i);
-    dump(int8_t(uint8_t((uint32_t(i) & 0xFF000000) >> 24)), out);
-    dump(int8_t(uint8_t((uint32_t(i) & 0x00FF0000) >> 16)), out);
-    dump(int8_t(uint8_t((uint32_t(i) & 0x0000FF00) >>  8)), out);
-    dump(int8_t(uint8_t((uint32_t(i) & 0x000000FF) >>  0)), out);
+void dump(uint32_t i, std::ostream& out) {
+    dump(static_cast<uint8_t>((i & 0xFF000000) >> 24), out);
+    dump(static_cast<uint8_t>((i & 0x00FF0000) >> 16), out);
+    dump(static_cast<uint8_t>((i & 0x0000FF00) >>  8), out);
+    dump(static_cast<uint8_t>((i & 0x000000FF) >>  0), out);
 }
 
 template <class T>
-void dump(std::vector<T>& xs, std::ostream& out) {
-    dump(static_cast<int32_t>(xs.size()), out);
+void dump(const std::vector<T>& xs, std::ostream& out) {
+    dump(xs.size(), out);
     for (auto&& x : xs) {
         dump(x, out);
     }
 }
 
-void dump(ConstructorInfo& c, std::ostream& out) {
+void dump(const ConstructorInfo& c, std::ostream& out) {
     dump(c.num_fields, out);
 }
 
-void dump(ConstantInfo&, std::ostream&);
+void dump(const ConstantInfo&, std::ostream&);
 
-void dump(AdtConstant& a, std::ostream& out) {
+void dump(const AdtConstant& a, std::ostream& out) {
     dump(a.adt_table_index, out);
     dump(a.constructor_index, out);
     dump(a.num_fields, out);
@@ -49,14 +46,14 @@ void dump(AdtConstant& a, std::ostream& out) {
     }
 }
 
-void dump(ConstantInfo& c, std::ostream& out) {
-    dump(static_cast<int8_t>(c.type), out);
+void dump(const ConstantInfo& c, std::ostream& out) {
+    dump(static_cast<uint8_t>(c.type), out);
     switch (c.type) {
         case ConstantType::int8:
-            dump(c.int8, out);
+            dump(static_cast<uint8_t>(c.int8), out);
             break;
         case ConstantType::int32:
-            dump(c.int32, out);
+            dump(static_cast<uint32_t>(c.int32), out);
             break;
         case ConstantType::adt:
             dump(c.adt, out);
@@ -65,120 +62,128 @@ void dump(ConstantInfo& c, std::ostream& out) {
 }
 
 void dump(Operation t, std::ostream& out) {
-    dump(static_cast<int8_t>(t), out);
+    dump(static_cast<uint8_t>(t), out);
 }
 
-void dump(Instruction& i, std::ostream& out) {
+void dump(const Instruction& i, std::ostream& out) {
     dump(i.op, out);
     dump(i.index, out);
     dump(i.index2, out);
 }
 
-void dump(FunctionInfo& f, std::ostream& out) {
+void dump(const FunctionInfo& f, std::ostream& out) {
     dump(f.num_args, out);
     dump(f.num_locals, out);
     dump(f.code, out);
 }
 
-void parse(int8_t* i, std::istream& in) {
+uint8_t& parse(uint8_t* i, std::istream& in) {
     auto re = in.get();
     if (re == std::istream::traits_type::eof()) {
         throw ParseError{};
     }
-    printf("parse_int8: %d\n", re);
-    *i = uint8_t(re);
+    *i = re;
+    return *i;
 }
 
-void parse(int16_t* i, std::istream& in) {
+uint16_t& parse(uint16_t* i, std::istream& in) {
     auto re = uint16_t{};
-    auto tmp = int8_t{};
-    re |= (parse(&tmp, in), uint8_t(tmp)) << 8;
-    re |= (parse(&tmp, in), uint8_t(tmp)) << 0;
-    printf("parse_int16: %d\n", re);
+    auto tmp = uint8_t{};
+    re |= parse(&tmp, in) << 8;
+    re |= parse(&tmp, in) << 0;
     *i = re;
+    return *i;
 }
 
-void parse(int32_t* i, std::istream& in) {
+uint32_t& parse(uint32_t* i, std::istream& in) {
     auto re = uint32_t{};
-    auto tmp = int8_t{};
-    re |= (parse(&tmp, in), uint8_t(tmp)) << 24;
-    re |= (parse(&tmp, in), uint8_t(tmp)) << 16;
-    re |= (parse(&tmp, in), uint8_t(tmp)) << 8;
-    re |= (parse(&tmp, in), uint8_t(tmp)) << 0;
-    printf("parse_int32: %d\n", re);
+    auto tmp = uint8_t{};
+    re |= parse(&tmp, in) << 24;
+    re |= parse(&tmp, in) << 16;
+    re |= parse(&tmp, in) << 8;
+    re |= parse(&tmp, in) << 0;
     *i = re;
+    return *i;
 }
 
 template <class T>
-void parse(std::vector<T>* v, std::istream& in) {
-    auto size = int32_t{};
+std::vector<T>& parse(std::vector<T>* v, std::istream& in) {
+    auto size = uint32_t{};
     parse(&size, in);
     std::vector<T> re(size);
-    for (auto i = int32_t{0}; i < size; ++i) {
-        parse(&re[i], in);
+    for (auto&& i : re) {
+        parse(&i, in);
     }
     *v = re;
+    return *v;
 }
 
-void parse(ConstructorInfo* c, std::istream& in) {
+ConstructorInfo& parse(ConstructorInfo* c, std::istream& in) {
     parse(&c->num_fields, in);
+    return *c;
 }
 
-void parse(ConstantType* c, std::istream& in) {
-    auto re = int8_t{};
+ConstantType& parse(ConstantType* c, std::istream& in) {
+    auto re = uint8_t{};
     parse(&re, in);
     *c = static_cast<ConstantType>(re);
+    return *c;
 }
 
-void parse(ConstantInfo*, std::istream&);
+ConstantInfo& parse(ConstantInfo*, std::istream&);
 
-void parse(AdtConstant* a, std::istream& in) {
+AdtConstant& parse(AdtConstant* a, std::istream& in) {
     auto re = AdtConstant{};
     parse(&re.adt_table_index, in);
     parse(&re.constructor_index, in);
     parse(&re.num_fields, in);
     re.fields = new ConstantInfo[re.num_fields];
-    for (int32_t i = 0; i < re.num_fields; ++i) {
-        parse(&re.fields[i], in);
+    for (auto i = re.num_fields; i != 0; --i) {
+        parse(&re.fields[re.num_fields - i], in);
     }
     *a = re;
+    return *a;
 }
 
-void parse(ConstantInfo* c, std::istream& in) {
+ConstantInfo& parse(ConstantInfo* c, std::istream& in) {
     auto re = ConstantInfo{};
     parse(&re.type, in);
     switch (re.type) {
         case ConstantType::int8:
-            parse(&re.int8, in);
+            parse(reinterpret_cast<uint8_t*>(&re.int8), in);
             break;
         case ConstantType::int32:
-            parse(&re.int32, in);
+            parse(reinterpret_cast<uint32_t*>(&re.int32), in);
             break;
         case ConstantType::adt:
             parse(&re.adt, in);
             break;
     }
     *c = re;
+    return *c;
 }
 
-void parse(Operation* i, std::istream& in) {
-    parse(reinterpret_cast<int8_t*>(i), in);
+Operation& parse(Operation* i, std::istream& in) {
+    parse(reinterpret_cast<uint8_t*>(i), in);
+    return *i;
 }
 
-void parse(Instruction* i, std::istream& in) {
+Instruction& parse(Instruction* i, std::istream& in) {
     auto re = Instruction{};
     parse(&re.op, in);
     parse(&re.index, in);
     parse(&re.index2, in);
     *i = re;
+    return *i;
 }
 
-void parse(FunctionInfo* f, std::istream& in) {
+FunctionInfo& parse(FunctionInfo* f, std::istream& in) {
     auto re = FunctionInfo{};
     parse(&re.num_args, in);
     parse(&re.num_locals, in);
     parse(&re.code, in);
     *f = re;
+    return *f;
 }
 
 void check_operand_type(rvm::OperandType t) {
@@ -188,7 +193,7 @@ void check_operand_type(rvm::OperandType t) {
 
 }
 
-void rvm::assembly::dump(Assembly& a, std::ostream& out) {
+void rvm::assembly::dump(const Assembly& a, std::ostream& out) {
     ::dump(MAGIC_NUMBER, out);
     ::dump(a.adt_table, out);
     ::dump(a.constant_table, out);
@@ -197,9 +202,8 @@ void rvm::assembly::dump(Assembly& a, std::ostream& out) {
 
 Assembly Assembly::parse(std::istream& in) {
     auto re = Assembly{};
-    auto magic = int32_t{};
+    auto magic = uint32_t{};
     ::parse(&magic, in);
-    printf("%x\n", magic);
     if (magic != MAGIC_NUMBER) throw ParseError{};
     ::parse(&re.adt_table, in);
     ::parse(&re.constant_table, in);
@@ -207,7 +211,7 @@ Assembly Assembly::parse(std::istream& in) {
     return re;
 }
 
-void rvm::assembly::validate(Assembly& a) {
+void rvm::assembly::validate(const Assembly& a) {
     for (auto& this_func : a.function_table) {
         for (auto&& pc : this_func.code) {
             switch (pc.op) {

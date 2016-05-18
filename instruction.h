@@ -59,8 +59,8 @@ enum class Operation: int8_t {
     stfld,  // field_index
 };
 
-using index_t = int16_t;
-using sindex_t = int8_t;
+using index_t = uint16_t;
+using sindex_t = uint8_t;
 struct Instruction {
     Operation op;
     union {

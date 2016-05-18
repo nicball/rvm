@@ -42,7 +42,7 @@ public:
     struct IndexOutOfBoundError {};
     struct StackUnderflowError {};
 
-    Interpreter(assembly::Assembly& a): assembly(a) {
+    Interpreter(const assembly::Assembly& a): assembly(a) {
         enter(assembly::MAIN_FUNCTION_INDEX);
     }
     void run();
@@ -85,7 +85,7 @@ inline Operand::Operand(assembly::ConstantInfo& c) {
             break;
         case assembly::ConstantType::adt:
             adt = (Adt*)malloc(sizeof(Adt) + c.adt.num_fields);
-            for (auto i = c.adt.num_fields; i > 0; --i) {
+            for (auto i = c.adt.num_fields; i != 0; --i) {
                 adt->fields[i - 1] = Operand{c.adt.fields[i - 1]};
             }
             break;

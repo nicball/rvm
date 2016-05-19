@@ -265,13 +265,13 @@ void rvm::assembly::validate(const Assembly& a) {
                 case Operation::teq:
                 case Operation::tne:
                 case Operation::tlt:
-                case Operation::tlt_s:
+                case Operation::tlt_un:
                 case Operation::tle:
-                case Operation::tle_s:
+                case Operation::tle_un:
                 case Operation::tgt:
-                case Operation::tgt_s:
+                case Operation::tgt_un:
                 case Operation::tge:
-                case Operation::tge_s:
+                case Operation::tge_un:
                     check_operand_type(pc.type);
                     break;
                 case Operation::br:

@@ -72,7 +72,7 @@ private:
     template <class Func>
     void logic_binop(Func);
     template <class Func>
-    void logic_binop_signed(Func);
+    void logic_binop_un(Func);
 };
 
 inline Operand::Operand(assembly::ConstantInfo& c) {
@@ -84,7 +84,7 @@ inline Operand::Operand(assembly::ConstantInfo& c) {
             int32 = c.int32;
             break;
         case assembly::ConstantType::adt:
-            adt = (Adt*)malloc(sizeof(Adt) + c.adt.num_fields);
+            adt = (Adt*) malloc(sizeof(Adt) + c.adt.num_fields - 1);
             for (auto i = c.adt.num_fields; i != 0; --i) {
                 adt->fields[i - 1] = Operand{c.adt.fields[i - 1]};
             }

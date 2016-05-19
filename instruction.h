@@ -41,13 +41,13 @@ enum class Operation: int8_t {
     teq,    // <type>
     tne,    // <type>
     tlt,    // <type>
-    tlt_s,  // <type>
+    tlt_un,  // <type>
     tle,    // <type>
-    tle_s,  // <type>
+    tle_un,  // <type>
     tgt,    // <type>
-    tgt_s,  // <type>
+    tgt_un,  // <type>
     tge,    // <type>
-    tge_s,  // <type>
+    tge_un,  // <type>
 
     br,     // #code
     brtrue, // #code

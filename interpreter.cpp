@@ -105,19 +105,19 @@ void Interpreter::logic_binop(Func f) {
 }
 
 template <class Func>
-void Interpreter::logic_binop_signed(Func f) {
+void Interpreter::logic_binop_un(Func f) {
     switch (current_function().code[program_counter].type) {
         case OperandType::int8:
         {
-            auto y = pop(operand_stack).int8;
-            auto x = pop(operand_stack).int8;
+            auto y = static_cast<uint8_t>(pop(operand_stack).int8);
+            auto x = static_cast<uint8_t>(pop(operand_stack).int8);
             operand_stack.push_back(Operand{static_cast<int8_t>(f(x, y))});
             break;
         }
         case OperandType::int32:
         {
-            auto y = pop(operand_stack).int32;
-            auto x = pop(operand_stack).int32;
+            auto y = static_cast<uint32_t>(pop(operand_stack).int32);
+            auto x = static_cast<uint32_t>(pop(operand_stack).int32);
             operand_stack.push_back(Operand{static_cast<int8_t>(f(x, y))});
             break;
         }
@@ -288,7 +288,7 @@ void Interpreter::step() {
         {
             auto y = pop(operand_stack);
             auto x = pop(operand_stack);
-            auto a = static_cast<int8_t>(memcmp(&x, &y, sizeof(Operand)) == 0 ? 1 : 0);
+            auto a = static_cast<int8_t>(memcmp(&x, &y, sizeof(Operand)) == 0 ? -1 : 0);
             operand_stack.push_back(Operand{a});
             break;
         }
@@ -296,33 +296,33 @@ void Interpreter::step() {
         {
             auto y = pop(operand_stack);
             auto x = pop(operand_stack);
-            auto a = static_cast<int8_t>(memcmp(&x, &y, sizeof(Operand)) == 0 ? 0 : 1);
+            auto a = static_cast<int8_t>(memcmp(&x, &y, sizeof(Operand)) == 0 ? 0 : -1);
             operand_stack.push_back(Operand{a});
             break;
         }
         case Operation::tlt:
             logic_binop(std::less<>{});
             break;
-        case Operation::tlt_s:
-            logic_binop_signed(std::less<>{});
+        case Operation::tlt_un:
+            logic_binop_un(std::less<>{});
             break;
         case Operation::tle:
             logic_binop(std::less_equal<>{});
             break;
-        case Operation::tle_s:
-            logic_binop_signed(std::less_equal<>{});
+        case Operation::tle_un:
+            logic_binop_un(std::less_equal<>{});
             break;
         case Operation::tgt:
             logic_binop(std::less<>{});
             break;
-        case Operation::tgt_s:
-            logic_binop_signed(std::less<>{});
+        case Operation::tgt_un:
+            logic_binop_un(std::less<>{});
             break;
         case Operation::tge:
             logic_binop(std::less_equal<>{});
             break;
-        case Operation::tge_s:
-            logic_binop_signed(std::less_equal<>{});
+        case Operation::tge_un:
+            logic_binop_un(std::less_equal<>{});
             break;
         case Operation::br:
         {
@@ -344,8 +344,8 @@ void Interpreter::step() {
             auto ctor = current_function().code[program_counter].index2;
             auto n = assembly.adt_table[idx][ctor].num_fields;
             auto adt = (Adt*) malloc(sizeof(Adt) + n);
-            for (int32_t i = 1; i <= n; ++i) {
-                adt->fields[n - i] = pop(operand_stack);
+            while (n-- != 0) {
+                adt->fields[n] = pop(operand_stack);
             }
             operand_stack.push_back(Operand{adt});
             break;
